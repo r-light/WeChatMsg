@@ -77,12 +77,15 @@ def christmas():
         'min_month_num': min_num,
     }
     calendar_data = analysis.calendar_chart(contact.wxid, True, year='2023')
-    emoji_msgs = msg_db.get_messages_by_type(contact.wxid, 47, year_='2023')
+    emoji_msgs = msg_db.get_messages_by_type(contact.wxid, 47, year_='2023', isSender_=0)
     url, num = get_most_emoji(emoji_msgs)
+    me_emoji_msgs = msg_db.get_messages_by_type(contact.wxid, 47, year_='2023', isSender_=1)
+    me_url, me_num = get_most_emoji(me_emoji_msgs)
     emoji_data = {
         'emoji_total_num': len(emoji_msgs),
-        'emoji_url': url,
-        'emoji_num': num,
+        'emoji_url_num': zip(url, num),
+        'me_emoji_total_num': len(me_emoji_msgs),
+        'me_emoji_url_num': zip(me_url, me_num),
     }
     return render_template("christmas.html", **data, **wordcloud_cloud_data, **time_data, **month_data, **calendar_data,
                            **emoji_data)

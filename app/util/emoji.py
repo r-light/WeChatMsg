@@ -205,13 +205,17 @@ def get_most_emoji(messages):
     md5_nums.sort(key=lambda x: x[0], reverse=True)
     if not md5_nums:
         return '', 0
-    md5 = md5_nums[0][1]
-    num = md5_nums[0][0]
-    emoji_info = md5_nums[0][2]
-    url = emoji_info['cdnurl']
-    if not url or url == "":
-        url = Emotion().get_emoji_url(md5, False)
-    return url, num
+    urls, nums = [], []
+    for i in range(10):
+        md5 = md5_nums[i][1]
+        num = md5_nums[i][0]
+        emoji_info = md5_nums[i][2]
+        url = emoji_info['cdnurl']
+        if not url or url == "":
+            url = Emotion().get_emoji_url(md5, False)
+        urls.append(url)
+        nums.append(num)
+    return urls, nums
 
 
 def get_emoji(xml_string, thumb=True, output_path=root_path) -> str:

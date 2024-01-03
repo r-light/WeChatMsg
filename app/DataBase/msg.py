@@ -167,35 +167,63 @@ class Msg:
         # result.sort(key=lambda x: x[5])
         return result
 
-    def get_messages_by_type(self, username_, type_, year_='all'):
+    def get_messages_by_type(self, username_, type_, year_='all', isSender_='all'):
         if not self.open_flag:
             return None
-        if year_ == 'all':
-            sql = '''
-                        select localId,TalkerId,Type,SubType,IsSender,CreateTime,Status,StrContent,strftime('%Y-%m-%d %H:%M:%S',CreateTime,'unixepoch','localtime') as StrTime,MsgSvrID,BytesExtra,CompressContent
-                        from MSG
-                        where StrTalker=? and Type=? 
-                        order by CreateTime
-                    '''
-            try:
-                lock.acquire(True)
-                self.cursor.execute(sql, [username_, type_])
-                result = self.cursor.fetchall()
-            finally:
-                lock.release()
-        else:
-            sql = '''
+        if isSender_ == 'all':
+            if year_ == 'all':
+                sql = '''
                             select localId,TalkerId,Type,SubType,IsSender,CreateTime,Status,StrContent,strftime('%Y-%m-%d %H:%M:%S',CreateTime,'unixepoch','localtime') as StrTime,MsgSvrID,BytesExtra,CompressContent
                             from MSG
-                            where StrTalker=? and Type=? and strftime('%Y', CreateTime, 'unixepoch', 'localtime') = ?
+                            where StrTalker=? and Type=? 
                             order by CreateTime
                         '''
-            try:
-                lock.acquire(True)
-                self.cursor.execute(sql, [username_, type_, year_])
-            finally:
-                lock.release()
-                result = self.cursor.fetchall()
+                try:
+                    lock.acquire(True)
+                    self.cursor.execute(sql, [username_, type_])
+                    result = self.cursor.fetchall()
+                finally:
+                    lock.release()
+            else:
+                sql = '''
+                                select localId,TalkerId,Type,SubType,IsSender,CreateTime,Status,StrContent,strftime('%Y-%m-%d %H:%M:%S',CreateTime,'unixepoch','localtime') as StrTime,MsgSvrID,BytesExtra,CompressContent
+                                from MSG
+                                where StrTalker=? and Type=? and strftime('%Y', CreateTime, 'unixepoch', 'localtime') = ?
+                                order by CreateTime
+                            '''
+                try:
+                    lock.acquire(True)
+                    self.cursor.execute(sql, [username_, type_, year_])
+                finally:
+                    lock.release()
+                    result = self.cursor.fetchall()
+        else:
+            if year_ == 'all':
+                sql = '''
+                            select localId,TalkerId,Type,SubType,IsSender,CreateTime,Status,StrContent,strftime('%Y-%m-%d %H:%M:%S',CreateTime,'unixepoch','localtime') as StrTime,MsgSvrID,BytesExtra,CompressContent
+                            from MSG
+                            where StrTalker=? and Type=? and IsSender =?
+                            order by CreateTime
+                        '''
+                try:
+                    lock.acquire(True)
+                    self.cursor.execute(sql, [username_, type_, isSender_])
+                    result = self.cursor.fetchall()
+                finally:
+                    lock.release()
+            else:
+                sql = '''
+                                select localId,TalkerId,Type,SubType,IsSender,CreateTime,Status,StrContent,strftime('%Y-%m-%d %H:%M:%S',CreateTime,'unixepoch','localtime') as StrTime,MsgSvrID,BytesExtra,CompressContent
+                                from MSG
+                                where StrTalker=? and Type=? and strftime('%Y', CreateTime, 'unixepoch', 'localtime') = ? and IsSender =?
+                                order by CreateTime
+                            '''
+                try:
+                    lock.acquire(True)
+                    self.cursor.execute(sql, [username_, type_, year_, isSender_])
+                finally:
+                    lock.release()
+                    result = self.cursor.fetchall()
         return result
 
     def get_messages_by_keyword(self, username_, keyword, num=5, max_len=10, year_='all'):

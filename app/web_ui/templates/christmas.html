@@ -194,38 +194,44 @@
     </div>
     <div class="section">
             <div>
-                <img class="Mountain-Image" src="https://www.freeimg.cn/i/2023/12/20/6582c04711cd2.png" alt="Mountain Image">
-                <img class="corner-light light-top-left txt" src="https://www.freeimg.cn/i/2023/12/20/6582c05d9dcbb.png" alt="Top Left Light">
-                <img class="corner-light light-top-right txt" src="https://www.freeimg.cn/i/2023/12/20/6582c07b257db.png" alt="Bottom Right Light">
-                <img src="https://www.freeimg.cn/i/2023/12/20/6582c064276db.png" alt="包饺子" class="corner-image left-bottom">
-                <img src="https://www.freeimg.cn/i/2023/12/21/658313714609b.png" alt="Right Top Image" class="corner-image right-bottom">
-                <div class="calendar-container">
-                    <div class="text012">{{year}}年</div>
+                <!-- <img class="Mountain-Image" src="https://www.freeimg.cn/i/2023/12/20/6582c04711cd2.png" alt="Mountain Image"> -->
+                <!-- <img class="corner-light light-top-left txt" src="https://www.freeimg.cn/i/2023/12/20/6582c05d9dcbb.png" alt="Top Left Light"> -->
+                <!-- <img class="corner-light light-top-right txt" src="https://www.freeimg.cn/i/2023/12/20/6582c07b257db.png" alt="Bottom Right Light"> -->
+                <!-- <img src="https://www.freeimg.cn/i/2023/12/20/6582c064276db.png" alt="包饺子" class="corner-image left-bottom"> -->
+                <!-- <img src="https://www.freeimg.cn/i/2023/12/21/658313714609b.png" alt="Right Top Image" class="corner-image right-bottom"> -->
+                <div >
                     <div class="text012">
-                        我们有
-                        <span style="color: brown;">{{chat_days}}</span>
-                        天在聊天
-                    </div>
-                    <div class="text012">有你在的日子里</div>
-                    <div class="text012">
-                        都很有
-                        <span style="color: brown;">意义</span>！
-                    </div>
+                        {{year}}年 我们有<span style="color: brown;">{{chat_days}}</span>天在聊天
+                    </div>             
                     <div><br></div>
-                    <div class="text012">这一年</div>
                     <div class="text012">
-                        一共发送了
-                        <span style="color: brown;">{{emoji_total_num}}</span>
-                        个表情包
+                        这一年Ta一共发送了<span style="color: brown;">{{emoji_total_num}}</span>个表情包
                     </div>
-                    <div class="text012">Ta最常用的表情包是</div>
-                    <img src="{{emoji_url}}" class="emoji">
+                    <div style="display: flex;">
+                        {% for url, num in emoji_url_num %}
+                            <div style="flex: 1; padding: 10px;"> 
+                                <img src="{{url}}" class="emoji">
+                                <div class="text012">
+                                    一共<span style="color: brown;">{{num}}</span>次
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
                     <div class="text012">
-                        一共
-                        <span style="color: brown;">{{emoji_num}}</span>次
+                        这一年你一共发送了<span style="color: brown;">{{me_emoji_total_num}}</span>个表情包
+                    </div>
+                    <div style="display: flex;">
+                        {% for url, num in me_emoji_url_num %}
+                            <div style="flex: 1; padding: 10px;"> 
+                                <img src="{{url}}" class="emoji">
+                                <div class="text012">
+                                    一共<span style="color: brown;">{{num}}</span>次
+                                </div>
+                            </div>
+                        {% endfor %}
                     </div>
                 </div>
-                <div id="calendar-chart" class="calendar-chart"></div>
+                <!-- <div id="calendar-chart" class="calendar-chart"></div> -->
             </div>
     </div>
     <div class="section">
@@ -314,7 +320,7 @@ setInterval(getRTime, 1000);
     // 根据屏幕宽度设置字体范围
     let cellSize;
     if (screenWidth < 768) { // 手机屏幕
-        result.calendar.cellSize = 10;
+        result..cellSize = 10;
     } else { // 电脑屏幕
         result.calendar.cellSize = 15;
     }
