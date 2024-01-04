@@ -72,7 +72,7 @@ class ContactInfo(QWidget, Ui_Form):
             # 创建群聊中成员信息
             contacts_map = {}
             chatroom_members = PackageMsg().get_chatroom_member_list(self.contact.wxid)
-            for wxid, displayName in chatroom_members:
+            for wxid in chatroom_members:
                 contact_info_list = micro_msg_db.get_contact_by_username(wxid)
                 if contact_info_list is None: # 群聊中已退群的联系人不会保存在数据库里
                     continue
@@ -87,7 +87,7 @@ class ContactInfo(QWidget, Ui_Form):
                 contact = Contact(contact_info)
                 contact.smallHeadImgBLOG = misc_db.get_avatar_buffer(contact.wxid)
                 contact.set_avatar(contact.smallHeadImgBLOG)
-                contact.set_avatar()
+                contact.save_avatar()
                 contacts_map[contact.wxid] = contact
             self.report_thread = ReportThread(self.contact, contacts_map)
             self.report_thread.okSignal.connect(lambda x: QDesktopServices.openUrl(QUrl("http://127.0.0.1:21314")))
