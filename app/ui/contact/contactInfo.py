@@ -1,12 +1,14 @@
 from PyQt5.QtCore import pyqtSignal, QUrl, QThread
 from PyQt5.QtGui import QDesktopServices
 from PyQt5.QtWidgets import QWidget, QMenu, QAction, QToolButton, QMessageBox, QDialog
+from app.DataBase import micro_msg_db, misc_db
 
 from app.DataBase.output_pc import Output
+from app.DataBase.package_msg import PackageMsg
 from app.ui.Icon import Icon
 from .contactInfoUi import Ui_Form
 from .userinfo import userinfo
-from ...person import Contact, Me
+from ...person import Contact, Me, Person
 from .export_dialog import ExportDialog
 
 
@@ -67,17 +69,37 @@ class ContactInfo(QWidget, Ui_Form):
 
     def annual_report(self):
         if 'room' in self.contact.wxid:
-            QMessageBox.warning(
-                self, '警告',
-                '暂不支持群组'
-            )
-            return
-        self.contact.save_avatar()
-        Me().save_avatar()
-        self.report_thread = ReportThread(self.contact)
-        self.report_thread.okSignal.connect(lambda x: QDesktopServices.openUrl(QUrl("http://127.0.0.1:21314")))
-        self.report_thread.start()
-        QDesktopServices.openUrl(QUrl("http://127.0.0.1:21314/christmas"))
+            # 创建群聊中成员信息
+            contacts_map = {}
+            chatroom_members = PackageMsg().get_chatroom_member_list(self.contact.wxid)
+            for wxid, displayName in chatroom_members:
+                contact_info_list = micro_msg_db.get_contact_by_username(wxid)
+                if contact_info_list is None: # 群聊中已退群的联系人不会保存在数据库里
+                    continue
+                contact_info = {
+                    'UserName': contact_info_list[0],
+                    'Alias': contact_info_list[1],
+                    'Type': contact_info_list[2],
+                    'Remark': contact_info_list[3],
+                    'NickName': contact_info_list[4],
+                    'smallHeadImgUrl': contact_info_list[7]
+                }
+                contact = Contact(contact_info)
+                contact.smallHeadImgBLOG = misc_db.get_avatar_buffer(contact.wxid)
+                contact.set_avatar(contact.smallHeadImgBLOG)
+                contact.set_avatar()
+                contacts_map[contact.wxid] = contact
+            self.report_thread = ReportThread(self.contact, contacts_map)
+            self.report_thread.okSignal.connect(lambda x: QDesktopServices.openUrl(QUrl("http://127.0.0.1:21314")))
+            self.report_thread.start()
+            QDesktopServices.openUrl(QUrl("http://127.0.0.1:21314/christmasForRoom"))
+        else:
+            self.contact.save_avatar()
+            Me().save_avatar()
+            self.report_thread = ReportThread(self.contact)
+            self.report_thread.okSignal.connect(lambda x: QDesktopServices.openUrl(QUrl("http://127.0.0.1:21314")))
+            self.report_thread.start()
+            QDesktopServices.openUrl(QUrl("http://127.0.0.1:21314/christmas"))
 
     def emotionale_Analysis(self):
         if 'room' in self.contact.wxid:
@@ -121,12 +143,14 @@ class ContactInfo(QWidget, Ui_Form):
 class ReportThread(QThread):
     okSignal = pyqtSignal(bool)
 
-    def __init__(self, contact):
+    def __init__(self, contact, contacts=None):
         super().__init__()
         self.contact = contact
+        self.contacts = contacts
 
     def run(self):
         from app.web_ui import web
         web.contact = self.contact
+        web.contacts = self.contacts
         web.run(port='21314')
         self.okSignal.emit(True)
