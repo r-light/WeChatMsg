@@ -2,6 +2,7 @@ from PyQt5.QtCore import pyqtSignal, QUrl, QThread
 from PyQt5.QtGui import QDesktopServices
 from PyQt5.QtWidgets import QWidget, QMenu, QAction, QToolButton, QMessageBox, QDialog
 from app.DataBase import micro_msg_db, misc_db
+from app.DataBase.micro_msg import MicroMsg
 
 from app.DataBase.output_pc import Output
 from app.DataBase.package_msg import PackageMsg
@@ -71,9 +72,13 @@ class ContactInfo(QWidget, Ui_Form):
 
     def annual_report(self):
         if 'room' in self.contact.wxid:
+            self.contact.save_avatar()
             # 创建群聊中成员信息
             contacts_map = {}
-            chatroom_members = PackageMsg().get_chatroom_member_list(self.contact.wxid)
+            chatroom_members = micro_msg_db.get_chatroom_member_list(self.contact.wxid)
+            if chatroom_members is None:
+                return
+            chatroom_members = chatroom_members[0].split('^G')
             for wxid in chatroom_members:
                 contact_info_list = micro_msg_db.get_contact_by_username(wxid)
                 if contact_info_list is None: # 群聊中已退群的联系人不会保存在数据库里
@@ -92,9 +97,9 @@ class ContactInfo(QWidget, Ui_Form):
                 contact.save_avatar()
                 contacts_map[contact.wxid] = contact
             self.report_thread = ReportThread(self.contact, contacts_map)
-            self.report_thread.okSignal.connect(lambda x: QDesktopServices.openUrl(QUrl("http://127.0.0.1:21314")))
+            # self.report_thread.okSignal.connect(lambda x: QDesktopServices.openUrl(QUrl("http://127.0.0.1:21314")))
             self.report_thread.start()
-            QDesktopServices.openUrl(QUrl("http://127.0.0.1:21314/christmasForRoom"))
+            # QDesktopServices.openUrl(QUrl("http://127.0.0.1:21314/christmasForRoom"))
         else:
             self.contact.save_avatar()
             Me().save_avatar()

@@ -1,5 +1,6 @@
 import os
 import sys
+from typing import Dict
 
 from flask import Flask, render_template, send_file
 
@@ -8,20 +9,25 @@ from app.DataBase.package_msg import PackageMsg
 from app.analysis import analysis
 from app.person import Contact, Me, Contacts
 from app.util.emoji import get_most_emoji
+from app.web_ui.util import *
 
 app = Flask(__name__)
 
 wxid = ''
 contact: Contact = None
-contacts: Contacts = None
+contacts = None
 
+def get_y_mar(s, a,b,c,d):
+    if "," in s:
+        return a,b
+    else:
+        return c,d
 
 @app.route("/")
 def index():
     # 渲染模板，并传递图表的 HTML 到模板中
     return "index.html"
 
-@app.route("/christmasForRoom")
 def christmasForRoom():
     """ 
         a[0]: localId,
@@ -38,15 +44,131 @@ def christmasForRoom():
         a[11]: CompressContent,
         a[12]: msg_sender, （ContactPC 或 ContactDefault 类型，这个才是群聊里的信息发送人，不是群聊或者自己是发送者没有这个字段） 
     """
-    # 渲染模板，并传递图表的 HTML 到模板中
+    year = '2023'
+    room_name = contact.nickName
     messages = PackageMsg().get_package_message_by_wxid(contact.wxid)
-    # 第一句话的时间，第一句话的内容,
-    firstWordDict = {}
-    for message in messages:
-        msg_sender = message[12]
-        wxid = msg_sender.wxid
-        if wxid not in firstWordDict or firstWordDict[wxid][8] > message[8]:
-            firstWordDict[wxid] = message
+    messages_len = len(messages)
+    if messages_len < 10:
+        return
+    def page_one():
+        print("正在生成第一页")
+        output_path = f'./data/room/{room_name}-1.png'
+        background_image_path = './data/pic/wechat.png'
+        background_image : Image = Image.open(background_image_path)
+        # 头像部分
+        background_image = draw_avatar(background_image, Image.open(contact.avatar_path), (320-175//2,50), (175,175), 5)
+        background_image = draw_text_emoji(background_image, room_name, 40, (320, 250), align="center", max_width=600)
+        # 内容部分
+        #  建立时间
+        firstWordDict = {}
+        firstTime = None
+        for message in messages:
+            msg_sender = message[12]
+            _wxid = msg_sender.wxid
+            if firstTime is None or firstTime > message[5]:
+                firstTime = message[5]
+            if message[2] != 1:
+                continue
+            if _wxid not in firstWordDict or firstWordDict[_wxid][5] > message[5]:
+                firstWordDict[_wxid] = message
+        first_day = timestamp_to_day(firstTime)
+        first_datetime = datetime.fromtimestamp(firstTime)
+        current_date = datetime.now()
+        difference = current_date - first_datetime
+        days_passed = difference.days
+        x = 60
+        y = 300
+        space = 30
+        # 认识天数
+        background_image, height = draw_multi_text(background_image, ["本群已经建立至少",str(days_passed),"天了"], [30,55,30],(x,y),
+                                    color_list=["white", "white", "white"],font_width_list=["normal", "bold", "normal"],
+                                    space=[5,5,0])
+        y += height+space
+        # 认识日期
+        background_image, height = draw_multi_text(background_image, ["从",first_day,"开始"], [30,40,30],(x,y),
+                                        color_list=["white", "white", "white"],font_width_list=["normal", "bold", "normal"],
+                                        space=[5,5,0])
+        total_msg_len_str = "{:,}".format(messages_len)
+        if "," in total_msg_len_str:
+            y+=height+space-20
+            top_mar = 10
+        else:
+            y+=height+space-15
+            top_mar = 0
+        # 消息总数
+        background_image, height = draw_multi_text(background_image, ["本群有",total_msg_len_str,"条聊天信息"], [30,55,30],(x,y),
+                                        color_list=["white", "white", "white"],font_width_list=["normal", "bold", "normal"],
+                                        space=[5,5,0],
+                                        top_margin=[0,top_mar,0])
+        y += height + space
+        # 说过的第一句话
+        background_image, height = draw_multi_text(background_image, ["你们说过的第一句话分别是"], [30],(x,y),
+                                        color_list=["white"],font_width_list=["normal"],
+                                        space=[5])
+        y += height + space
+        for _wxid, _message in firstWordDict.items():
+            nickName = contacts[_wxid].nickName
+            text = nickName + ":" + _message[7]
+            background_image = draw_text_emoji(background_image, text, 30, (x, y), max_width=640-x)
+            y += 50
+        background_image.save(output_path)
+        print("生成完成，路径在：", f"生成结果 {output_path}")
+
+    def page_two():
+        print("正在生成第二页")
+        output_path = f'./data/room/{room_name}-2.png'
+        background_image_path = './data/pic/txt.png'
+        background_image = Image.open(background_image_path)
+        background_image = draw_text(background_image, f"『{year}年度·文本』", 40, (320, 40), align="center", max_width=500)
+
+        #文本消息
+        x = 40
+        y = 100
+        space = 35
+        # 年度消息
+        background_image, height = draw_multi_text(background_image, ["在这一年"], [30],(x,y),
+                                    color_list=["white"],font_width_list=["normal"],
+                                    space=[5])
+        year_msg_len_str = "{:,}".format(messages_len)
+        y,top_mar = get_y_mar(year_msg_len_str, y+height+space-25, 10, y+height+space-20, 0)
+        background_image, height = draw_multi_text(background_image, ["本群有",year_msg_len_str,"条聊天信息"], [30,55,30],(x,y),
+                                        color_list=["white", "white", "white"],font_width_list=["normal", "bold", "normal"],
+                                        space=[5,5,0],
+                                        top_margin=[0,top_mar,0])
+        # 文本信息
+        txt_time = 0
+        word_len = 0
+        for message in messages:
+            msg_sender = message[12]
+            _wxid = msg_sender.wxid
+            if message[2] != 1:
+                continue
+            txt_time += 1
+            word_len += len(message[7])
+        txt_time = "{:,}".format(txt_time)
+        y,top_mar = get_y_mar(txt_time, y+height+space-20, 10, y+height+space-20, 0)
+        background_image, height = draw_multi_text(background_image, ["其中，文本信息有",txt_time,"条"], [30,55,30],(x,y),
+                                    color_list=["white", "white", "white"],font_width_list=["normal", "bold", "normal"],
+                                    space=[5,5,0],
+                                    top_margin=[0,top_mar,0])
+        
+        word_len_str = "{:,}".format(word_len)
+        y,top_mar = get_y_mar(word_len_str, y+height+space-20, 10, y+height+space-15, 0)
+        background_image, height = draw_multi_text(background_image, ["共计",word_len_str,"个字"], [30,55,30],(x,y),
+                                    color_list=["white", "white", "white"],font_width_list=["normal", "bold", "normal"],
+                                    space=[5,5,0],
+                                    top_margin=[0,top_mar,0])
+        paper_num = int(word_len / 800)
+        y += height+space-10
+        background_image, height = draw_multi_text(background_image, ["这些字连起来，可以写",str(paper_num),"篇高考作文"], [30,45,30],(x,y),
+                                    color_list=["white", "#f4b9d1", "white"],font_width_list=["normal", "bold", "normal"],
+                                    space=[5,5,0])
+        # background_image = get_rank_list(background_image, (50,650), 600, txt_rank, wxid_to_want_name, wxid_to_name)
+
+        background_image.save(output_path)
+        print("生成完成，路径在：", f"生成结果 {output_path}")
+    # page_one()
+    page_two()
     # try:
         # first_message, first_time = msg_db.get_first_time_of_message(contact.wxid)
     # except TypeError:
@@ -58,8 +180,7 @@ def christmasForRoom():
     #     'my_nickname': Me().name,
     #     'first_time': first_time,
     # }
-    wordcloud_cloud_data = analysis.wordcloud_christmas(contact.wxid)
-    return render_template("christmas.html", **wordcloud_cloud_data)
+    # wordcloud_cloud_data = analysis.wordcloud_christmas(contact.wxid)
     # msg_data = msg_db.get_messages_by_hour(contact.wxid, year_="2023")
     # msg_data.sort(key=lambda x: x[1], reverse=True)
     # desc = {
@@ -68,7 +189,7 @@ def christmasForRoom():
     #                  "17:00", "18:00", "19:00", "20:00", "21:00"},
     # }
     # time_, num = msg_data[0] if msg_data else ('', 0)
-    # chat_time = f"凌晨{time_}" if time_ in {'00:00', '01:00', '02:00', '03:00', '04:00', '05:00'} else time_
+    # chat_time = f"凌晨{time_}" if time_ in {'00:00', '01:00', '02:00', '03:00', '04:00'``, '05:00'} else time_
     # label = '夜猫子'
     # for key, item in desc.items():
     #     if time_ in item:
@@ -255,7 +376,10 @@ def test():
 
 
 def run(port=21314):
-    app.run(debug=True, host='0.0.0.0', port=port, use_reloader=False)
+    if contacts is not None:
+        christmasForRoom()
+    else:
+        app.run(debug=True, host='0.0.0.0', port=port, use_reloader=False)
 
 
 def resource_path(relative_path):

@@ -122,6 +122,21 @@ class MicroMsg:
             lock.release()
         return result
 
+    def get_chatroom_member_list(self, chatroomname):
+        '''
+        获取群聊成员wxid
+        '''
+        if not self.open_flag:
+            return None
+        try:
+            lock.acquire(True)
+            sql = '''SELECT UserNameList FROM ChatRoom WHERE ChatRoomName = ?'''
+            self.cursor.execute(sql, [chatroomname])
+            result = self.cursor.fetchone()
+        finally:
+            lock.release()
+        return result
+
     def close(self):
         if self.open_flag:
             try:
