@@ -4,6 +4,7 @@ import sys
 from flask import Flask, render_template, send_file
 
 from app.DataBase import msg_db
+from app.DataBase.package_msg import PackageMsg
 from app.analysis import analysis
 from app.person import Contact, Me, Contacts
 from app.util.emoji import get_most_emoji
@@ -22,9 +23,32 @@ def index():
 
 @app.route("/christmasForRoom")
 def christmasForRoom():
+    """ 
+        a[0]: localId,
+        a[1]: talkerId, （和strtalker对应的，不是群聊信息发送人）
+        a[2]: type,
+        a[3]: subType,
+        a[4]: is_sender,
+        a[5]: timestamp,
+        a[6]: status, （没啥用）
+        a[7]: str_content,
+        a[8]: str_time, （格式化的时间）
+        a[9]: msgSvrId,
+        a[10]: BytesExtra,
+        a[11]: CompressContent,
+        a[12]: msg_sender, （ContactPC 或 ContactDefault 类型，这个才是群聊里的信息发送人，不是群聊或者自己是发送者没有这个字段） 
+    """
     # 渲染模板，并传递图表的 HTML 到模板中
+    messages = PackageMsg().get_package_message_by_wxid(contact.wxid)
+    # 第一句话的时间，第一句话的内容,
+    firstWordDict = {}
+    for message in messages:
+        msg_sender = message[12]
+        wxid = msg_sender.wxid
+        if wxid not in firstWordDict or firstWordDict[wxid][8] > message[8]:
+            firstWordDict[wxid] = message
     # try:
-    #     first_message, first_time = msg_db.get_first_time_of_message(contact.wxid)
+        # first_message, first_time = msg_db.get_first_time_of_message(contact.wxid)
     # except TypeError:
     #     first_time = '2023-01-01 00:00:00'
     # data = {
