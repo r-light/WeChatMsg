@@ -1,19 +1,17 @@
 import os
 import sys
-from typing import Dict
 
 from flask import Flask, render_template, send_file
 
 from app.DataBase import msg_db
 from app.DataBase.package_msg import PackageMsg
 from app.analysis import analysis
-from app.person import Contact, Me, Contacts
+from app.person import Contact, Me
 from app.util.emoji import get_most_emoji
 from app.web_ui.util import *
 
 app = Flask(__name__)
 
-wxid = ''
 contact: Contact = None
 contacts = None
 
@@ -22,6 +20,52 @@ def get_y_mar(s, a,b,c,d):
         return a,b
     else:
         return c,d
+
+def get_rank_list(bg_image, pos, right, wxid_to_num, wxid_to_room_name, unit="条",limit=4, tag="文本信息排行"):
+    res = []
+    msg_sum = 0
+    for key in wxid_to_num:
+        # print(wxid_to_name[key]["conRemark"], wxid_to_num[key])
+        msg_sum += wxid_to_num[key]
+        if key not in wxid_to_room_name:
+            continue
+        res.append(key)
+    res.sort(key=lambda k : wxid_to_num[k], reverse=True)
+
+    iter_len = min(limit, len(res))
+    x = pos[0]
+    y = pos[1]
+    space = 20
+
+    bg_image, width,height = draw_text_rank(bg_image, tag, 25, (320,y), font_width="bold",align="center",v_align="center",color="white")
+    y += height+30
+    for i in range(iter_len):
+        wxid = res[i]
+        avatar_path = wxid_to_room_name[wxid].avatar_path
+        person_num = wxid_to_num[wxid]
+        person_name = wxid_to_room_name[wxid].nickName
+        person_rate = int(person_num / msg_sum * 100)
+        # print(wxid_to_name[wxid]["conRemark"], wxid_to_num[wxid])
+        ava_img = Image.open(avatar_path)
+        bg_image, width,height = draw_text_rank(bg_image, str(i+1)+".", 30, (x,y), align="leaf",v_align="center",color="white")
+        bg_image = draw_avatar(bg_image,ava_img, (x+50,y), (60,60), 2, v_align="center")
+
+
+        bg_image, width, height = draw_multi_text_rank(bg_image, [str(person_rate),"%，",str(person_num), unit], font_size_list=[30,20,30,20], pos=(right,y),
+                            color_list=["white", "white","white", "white"],
+                             font_width_list=["bold", "normal","bold", "normal"],
+                             space=[0,10,0,0])
+        right_width = width
+        name_x = x+50+60+20
+        bg_image, width,height = draw_text_rank(bg_image, person_name, 25, (name_x,y), align="leaf",v_align="center",color="white",max_width=right-name_x-right_width-10)
+        # bg_image, width,height = draw_text_rank(bg_image, str(person_num), 30, (right-width,y), align="right",v_align="center",color="white")
+        # right_margin = right_margin + width
+        # bg_image, width,height = draw_text_rank(bg_image, "%", 20, (right-width-right_margin-20, y), align="right",v_align="center",color="white")
+        # right_margin = right_margin + width +20
+        # bg_image, width,height = draw_text_rank(bg_image, str(person_rate), 30, (right-right_margin, y), align="right",v_align="center",color="white")
+        # bg_image = draw_avatar(bg_image, Image.open(avatar_path),(320-175//2,112),(175,175),5)
+        y += space+60
+    return bg_image
 
 @app.route("/")
 def index():
@@ -138,13 +182,16 @@ def christmasForRoom():
         # 文本信息
         txt_time = 0
         word_len = 0
+        txt_rank = {}
         for message in messages:
-            msg_sender = message[12]
-            _wxid = msg_sender.wxid
             if message[2] != 1:
                 continue
+            wxid = message[12].wxid
             txt_time += 1
             word_len += len(message[7])
+            if wxid not in txt_rank:
+                txt_rank[wxid] = 0
+            txt_rank[wxid] += 1
         txt_time = "{:,}".format(txt_time)
         y,top_mar = get_y_mar(txt_time, y+height+space-20, 10, y+height+space-20, 0)
         background_image, height = draw_multi_text(background_image, ["其中，文本信息有",txt_time,"条"], [30,55,30],(x,y),
@@ -158,12 +205,14 @@ def christmasForRoom():
                                     color_list=["white", "white", "white"],font_width_list=["normal", "bold", "normal"],
                                     space=[5,5,0],
                                     top_margin=[0,top_mar,0])
-        paper_num = int(word_len / 800)
         y += height+space-10
-        background_image, height = draw_multi_text(background_image, ["这些字连起来，可以写",str(paper_num),"篇高考作文"], [30,45,30],(x,y),
-                                    color_list=["white", "#f4b9d1", "white"],font_width_list=["normal", "bold", "normal"],
-                                    space=[5,5,0])
-        # background_image = get_rank_list(background_image, (50,650), 600, txt_rank, wxid_to_want_name, wxid_to_name)
+
+        # paper_num = int(word_len / 800)
+        # background_image, height = draw_multi_text(background_image, ["这些字连起来，可以写",str(paper_num),"篇高考作文"], [30,45,30],(x,y),
+        #                             color_list=["white", "#f4b9d1", "white"],font_width_list=["normal", "bold", "normal"],
+        #                             space=[5,5,0])
+        # y += height+space-10
+        background_image = get_rank_list(background_image, (50, y), 600, txt_rank, contacts, limit=len(txt_rank))
 
         background_image.save(output_path)
         print("生成完成，路径在：", f"生成结果 {output_path}")
