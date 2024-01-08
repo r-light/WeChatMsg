@@ -206,7 +206,7 @@ def get_most_emoji(messages):
     if not md5_nums:
         return '', 0
     urls, nums = [], []
-    for i in range(10):
+    for i in range(12):
         md5 = md5_nums[i][1]
         num = md5_nums[i][0]
         emoji_info = md5_nums[i][2]

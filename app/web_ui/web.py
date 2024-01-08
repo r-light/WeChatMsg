@@ -1,4 +1,6 @@
+from datetime import timedelta
 import os
+import pickle
 import sys
 
 from flask import Flask, render_template, send_file
@@ -9,11 +11,25 @@ from app.analysis import analysis
 from app.person import Contact, Me
 from app.util.emoji import get_most_emoji
 from app.web_ui.util import *
+from chinese_calendar import is_holiday
 
 app = Flask(__name__)
 
 contact: Contact = None
 contacts = None
+
+def save_pickle(data, file_path):
+    if os.path.exists(file_path):
+        return
+    with open(file_path, 'wb') as f:
+        pickle.dump(data, f)
+
+def load_pickle(file_path):
+    if os.path.exists(file_path):
+        with open(file_path, 'rb') as f:
+            loaded_list = pickle.load(f)
+            return loaded_list
+    return None
 
 def get_y_mar(s, a,b,c,d):
     if "," in s:
@@ -21,7 +37,7 @@ def get_y_mar(s, a,b,c,d):
     else:
         return c,d
 
-def get_rank_list(bg_image, pos, right, wxid_to_num, wxid_to_room_name, unit="条",limit=4, tag="文本信息排行"):
+def get_rank_list(bg_image, pos, right, wxid_to_num, wxid_to_room_name, unit="条",limit=4, tag=""):
     res = []
     msg_sum = 0
     for key in wxid_to_num:
@@ -37,8 +53,11 @@ def get_rank_list(bg_image, pos, right, wxid_to_num, wxid_to_room_name, unit="�
     y = pos[1]
     space = 20
 
-    bg_image, width,height = draw_text_rank(bg_image, tag, 25, (320,y), font_width="bold",align="center",v_align="center",color="white")
-    y += height+30
+    if len(tag) > 0:
+        bg_image, width,height = draw_text_rank(bg_image, tag, 25, (320,y), font_width="bold",align="center",v_align="center",color="white")
+        y += height+30
+    else:
+        y += 30
     for i in range(iter_len):
         wxid = res[i]
         avatar_path = wxid_to_room_name[wxid].avatar_path
@@ -90,6 +109,11 @@ def christmasForRoom():
     """
     year = '2023'
     room_name = contact.nickName
+    # file_path = f'./data/pickle/{contact.wxid}'
+    # messages = load_pickle(file_path)
+    # if messages is None:
+    #     messages = PackageMsg().get_package_message_by_wxid(contact.wxid)
+    # save_pickle(messages, file_path)
     messages = PackageMsg().get_package_message_by_wxid(contact.wxid)
     messages_len = len(messages)
     if messages_len < 10:
@@ -163,19 +187,19 @@ def christmasForRoom():
         output_path = f'./data/room/{room_name}-2.png'
         background_image_path = './data/pic/txt.png'
         background_image = Image.open(background_image_path)
-        background_image = draw_text(background_image, f"『{year}年度·文本』", 40, (320, 40), align="center", max_width=500)
+        background_image = draw_text(background_image, f"『{year}年度·话痨』", 40, (320, 40), align="center", max_width=500)
 
         #文本消息
         x = 40
         y = 100
         space = 35
         # 年度消息
-        background_image, height = draw_multi_text(background_image, ["在这一年"], [30],(x,y),
-                                    color_list=["white"],font_width_list=["normal"],
-                                    space=[5])
+        # background_image, height = draw_multi_text(background_image, ["在这一年"], [30],(x,y),
+        #                             color_list=["white"],font_width_list=["normal"],
+        #                             space=[5])
         year_msg_len_str = "{:,}".format(messages_len)
-        y,top_mar = get_y_mar(year_msg_len_str, y+height+space-25, 10, y+height+space-20, 0)
-        background_image, height = draw_multi_text(background_image, ["本群有",year_msg_len_str,"条聊天信息"], [30,55,30],(x,y),
+        y,top_mar = get_y_mar(year_msg_len_str, y+space-25, 10, y+space-20, 0)
+        background_image, height = draw_multi_text(background_image, ["这一年本群有",year_msg_len_str,"条聊天信息"], [30,55,30],(x,y),
                                         color_list=["white", "white", "white"],font_width_list=["normal", "bold", "normal"],
                                         space=[5,5,0],
                                         top_margin=[0,top_mar,0])
@@ -184,14 +208,14 @@ def christmasForRoom():
         word_len = 0
         txt_rank = {}
         for message in messages:
-            if message[2] != 1:
-                continue
             wxid = message[12].wxid
-            txt_time += 1
-            word_len += len(message[7])
-            if wxid not in txt_rank:
+            if message[2] == 1:
+                txt_time += 1
+                word_len += len(message[7])
+            if wxid not in txt_rank and wxid in contacts:
                 txt_rank[wxid] = 0
-            txt_rank[wxid] += 1
+            if wxid in wxid in contacts:
+                txt_rank[wxid] += 1
         txt_time = "{:,}".format(txt_time)
         y,top_mar = get_y_mar(txt_time, y+height+space-20, 10, y+height+space-20, 0)
         background_image, height = draw_multi_text(background_image, ["其中，文本信息有",txt_time,"条"], [30,55,30],(x,y),
@@ -205,19 +229,145 @@ def christmasForRoom():
                                     color_list=["white", "white", "white"],font_width_list=["normal", "bold", "normal"],
                                     space=[5,5,0],
                                     top_margin=[0,top_mar,0])
-        y += height+space-10
+        y += height + space
+        maxx_wxid = max(txt_rank, key=txt_rank.get)
+        minn_wxid = min(txt_rank, key=txt_rank.get)
+        offset = 60
+        ava_img = Image.open(contacts[maxx_wxid].avatar_path)
+        background_image = draw_avatar(background_image, ava_img, (x+offset,y), (60, 60), 2)
+        background_image = draw_text(background_image, "摸鱼之王", 30, (x + 70 + offset, y+15), max_width=600, font_width='')
+        ava_img = Image.open(contacts[minn_wxid].avatar_path)
+        background_image = draw_avatar(background_image, ava_img, (x+300+offset,y), (60, 60), 2)
+        background_image = draw_text(background_image, "感情淡了", 30, (x + 370 + offset, y+15), max_width=600, font_width='')
 
-        # paper_num = int(word_len / 800)
-        # background_image, height = draw_multi_text(background_image, ["这些字连起来，可以写",str(paper_num),"篇高考作文"], [30,45,30],(x,y),
-        #                             color_list=["white", "#f4b9d1", "white"],font_width_list=["normal", "bold", "normal"],
-        #                             space=[5,5,0])
-        # y += height+space-10
-        background_image = get_rank_list(background_image, (50, y), 600, txt_rank, contacts, limit=len(txt_rank))
+        y += 75
+        background_image = get_rank_list(background_image, (50, y), 600, txt_rank, contacts, limit=min(len(txt_rank), 7))
 
         background_image.save(output_path)
         print("生成完成，路径在：", f"生成结果 {output_path}")
+
+    def page_three():
+        print("正在生成第三页")
+        output_path = f'./data/room/{room_name}-3.png'
+        background_image_path = './data/pic/txt.png'
+        background_image = Image.open(background_image_path)
+        background_image = draw_text(background_image, f"『{year}年度·家人』", 40, (320, 40), align="center", max_width=500)
+
+        #文本消息
+        x = 40
+        y = 100
+        space = 35
+        # 平均消息
+        holiday_tot, holiday_num = 0, 0
+        firstTime = None
+        txt_time = 0
+        txt_rank = {}
+        for message in messages:
+            wxid = message[12].wxid
+            if wxid not in contacts:
+                continue
+            if firstTime is None or firstTime > message[5]:
+                firstTime = message[5]
+            txt_time += 1
+            if is_holiday(datetime.fromtimestamp(message[5])):
+                holiday_tot += 1
+                if wxid not in txt_rank:
+                    txt_rank[wxid] = 0
+                txt_rank[wxid] += 1
+        first_day = datetime.fromtimestamp(firstTime)
+        end_date = datetime(2023, 12, 31)
+        tot_day = (end_date - first_day).days
+        while first_day <= end_date:
+            holiday_num += 1
+            first_day += timedelta(days=1)
+
+        #  每天平均条数
+        data1 = "{:,}".format(txt_time//tot_day)
+        y,top_mar = get_y_mar(data1, y+space-25, 10, y+space-20, 0)
+        background_image, height = draw_multi_text(background_image, ["本群平均每天有",data1,"条消息"], [30,55,30],(x,y),
+                                        color_list=["white", "white", "white"],font_width_list=["normal", "bold", "normal"],
+                                        space=[5,5,0],
+                                        top_margin=[0,top_mar,0])
+        # 节假日平均天数
+        data2 = "{:,}".format(holiday_tot//holiday_num)
+        y,top_mar = get_y_mar(data2, y+height+space-20, 10, y+height+space-20, 0)
+        background_image, height = draw_multi_text(background_image, ["节假日平均只有",data2,"条"], [30,55,30],(x,y),
+                                    color_list=["white", "white", "white"],font_width_list=["normal", "bold", "normal"],
+                                    space=[5,5,0],
+                                    top_margin=[0,top_mar,0])
+        space = 25
+        y += height + space
+        maxx_wxid = max(txt_rank, key=txt_rank.get)
+        minn_wxid = min(txt_rank, key=txt_rank.get)
+        offset = 60
+        img_height = 50
+        ava_img = Image.open(contacts[maxx_wxid].avatar_path)
+        background_image = draw_avatar(background_image, ava_img, (x+offset,y), (60, 60), 2)
+        background_image = draw_text(background_image, "真正的家人", 30, (x + 70 + offset, y+15), max_width=600, font_width='')
+        y += img_height + space
+        ava_img = Image.open(contacts[minn_wxid].avatar_path)
+        background_image = draw_avatar(background_image, ava_img, (x+offset,y), (60, 60), 2)
+        background_image = draw_text(background_image, "群友只是工作搭子", 30, (x + 70 + offset, y+15), max_width=600, font_width='')
+        y += img_height + space
+        # for smz
+        ava_img = Image.open(contacts['wxid_yi5jfmuk23x822'].avatar_path)
+        background_image = draw_avatar(background_image, ava_img, (x+offset,y), (60, 60), 2)
+        background_image = draw_text(background_image, "疑似小号", 30, (x + 70 + offset, y+15), max_width=600, font_width='')
+        y += img_height + space
+        background_image = get_rank_list(background_image, (50, y), 600, txt_rank, contacts, limit=min(len(txt_rank), 7))
+
+        background_image.save(output_path)
+        print("生成完成，路径在：", f"生成结果 {output_path}")
+    
+    def page_img():
+        print("正在生成表情包页")
+        output_path = f'./data/room/{room_name}-img.png'
+        bimg_num = 0
+        bimg_to_num = {}
+        bimg_rank = {}
+        emoji_msgs = msg_db.get_messages_by_type(contact.wxid, 47, year_='2023')
+        urls, nums = get_most_emoji(emoji_msgs)
+        download_images = []
+        for url in urls:
+            download_images.append(download_image(url))
+        for message in messages:
+            if message[2] != 47:
+                continue
+            wxid = message[12].wxid
+            bimg_num += 1
+            if wxid not in bimg_rank:
+                bimg_rank[wxid] = 0
+            bimg_rank[wxid] += 1
+
+        # 画图
+        background_image_path = './data/pic/wechat.png'
+        background_image = Image.open(background_image_path)
+        background_image = draw_text(background_image, f"『{year}年度·表情包』", 40, (320, 40), align="center", max_width=500)
+        x = 60
+        y = 100
+        space = 10
+
+        background_image, height = draw_multi_text(background_image, ["本群一共发送了", str(bimg_num), "张表情包"], [30,55,30],(x,y),
+                                        color_list=["white", "#fbb5cd", "white"],font_width_list=["normal", "bold", "normal"],
+                                        space=[5,5,0],
+                                        top_margin=[0,0,0])
+        y += height+space+20
+        for i in range(2):
+            for j in range(6):
+                idx = i*6+j
+                background_image = insert_image(background_image, download_images[idx], (20+100*j, y+i*100), (100, 100))
+        y += 200 + space + 30
+        background_image = get_rank_list(background_image, (50,y), 600, bimg_rank, contacts, unit="张", limit=min(7, len(bimg_rank)), tag="表情包排行")
+
+        background_image.save(output_path)
+        print("生成完成，路径在：", f"生成结果 {output_path}")
+    
+    # def page_revoke():
+        
     # page_one()
     page_two()
+    # page_three()
+    # page_img()
     # try:
         # first_message, first_time = msg_db.get_first_time_of_message(contact.wxid)
     # except TypeError:
